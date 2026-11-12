@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Harvest Desk</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;700;800&display=swap">
+<style>
+/* Layout: a Township-style island fills the stage, the farm ledger sits beside it. One bright daylight look on purpose, so no dark variant. */
+:root {
+  --leaf: #2f8f46; --leaf-deep: #1c5e33; --sun: #ffc531; --sun-deep: #d98e0a; --water: #2f9fd8;
+  --sky: #bfeaf7; --panel: #fffdf2; --ink: #1d3b2a; --muted: #55705f;
+  --good: #1f9d4d; --bad: #d8412f; --line: #cfe3bd; --track: #e4efd4;
+  --display: "Baloo 2", "Trebuchet MS", sans-serif; --body: "Nunito", "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--sky); color: var(--ink); font-family: var(--body); font-size: 15px; font-weight: 600;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 24px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 12px; }
+.hud { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 28px; line-height: 1; color: var(--leaf-deep); align-self: center; margin-right: auto; }
+.brand small { display: block; font-family: var(--body); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #9a6204; margin-top: 4px; }
+.stat { background: var(--panel); border: 3px solid var(--leaf-deep); border-radius: 14px; box-shadow: 0 4px 0 var(--leaf-deep); padding: 6px 14px; min-width: 132px; }
+.stat b { display: block; font-family: var(--display); font-size: 24px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); font-weight: 800; }
+.stat.wx { min-width: 200px; flex: 0 1 280px; }
+.stat.wx b { font-size: 19px; }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+.banner { border-radius: 12px; padding: 8px 14px; font-weight: 800; background: #fff3c9; border: 2px solid var(--sun-deep); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.banner.demo { background: repeating-linear-gradient(135deg, #ffe58a 0 14px, #ffd65c 14px 28px); }
+.banner.ready { background: var(--sun); border-color: var(--leaf-deep); font-family: var(--display); font-size: 19px; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 12px; align-items: start; }
+.stage { border: 4px solid var(--leaf-deep); border-radius: 18px; overflow: hidden; box-shadow: 0 5px 0 var(--leaf-deep); background: #57c2e6; min-width: 0; }
+.stage { position: relative; aspect-ratio: 16 / 10.4; isolation: isolate; }
+canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+canvas:active { cursor: grabbing; }
+#tags { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.tag { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: var(--display); font-weight: 800; will-change: transform; }
+.tag.name { font-size: 11px; color: #173d27; background: rgba(255,255,255,.9); border-radius: 7px; padding: 0 6px; }
+.tag.sign { font-size: 14px; color: #fff; background: rgba(23,70,42,.92); border-radius: 9px; padding: 1px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.tag.sign.light { background: rgba(255,255,255,.88); color: var(--leaf-deep); font-size: 12px; }
+.tag.sign.gold { background: linear-gradient(#ffdf6e, #ffb81f); color: var(--ink); }
+.tag.sign.bad { background: var(--bad); }
+.tag.bubble { font-family: var(--body); font-size: 14px; color: var(--ink); background: #fff; border: 2px solid var(--leaf-deep); border-radius: 11px; padding: 2px 10px; z-index: 3; }
+.tag.zz { color: #fff; font-size: 13px; text-shadow: 0 1px 3px #0007; }
+.tag.float { font-size: 22px; z-index: 4; text-shadow: 0 2px 0 #0006, 0 0 14px #ffd76a; color: #fff27a; }
+.tag.float.loss { color: #ffd2cc; text-shadow: 0 2px 0 #0006; }
+.tag.readytag { font-size: 20px; color: var(--ink); background: linear-gradient(#fff1a8, #ffc531); border: 2px solid #fff; border-radius: 12px; padding: 2px 14px; box-shadow: 0 0 24px #ffc531; z-index: 2; animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 44px #ffd76a; } }
+.stagebar { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+button.mini { font-size: 12px; padding: 2px 10px; border-radius: 9px; background: rgba(23,70,42,.85); box-shadow: none; }
+.hint { position: absolute; left: 10px; bottom: 8px; font-size: 12px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px #0009; pointer-events: none; }
+.fan { position: absolute; inset: 34% 0 auto; display: grid; justify-items: center; gap: 2px; padding: 12px 16px; text-align: center; background: linear-gradient(90deg, transparent, rgba(8,44,26,.78) 18%, rgba(8,44,26,.78) 82%, transparent); pointer-events: none; animation: pop .45s cubic-bezier(.2,1.6,.4,1); }
+.fan b { font-family: var(--display); font-size: clamp(26px, 5vw, 50px); line-height: 1.05; color: #ffd84d; text-shadow: 0 3px 0 #9a5a00, 0 0 24px #ffc531; }
+.fan span { color: #fff; font-weight: 800; }
+.fan.bad b { color: #ffb4a8; text-shadow: 0 3px 0 #7a1a10; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+.toastbox { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: linear-gradient(#fff1a8, #ffc531); color: var(--ink); font-family: var(--display); font-weight: 800; border-radius: 12px; padding: 4px 14px; box-shadow: 0 3px 0 var(--sun-deep); white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+#no3d { position: absolute; inset: auto 12px 12px; }
+.link { display: flex; gap: 10px; align-items: center; }
+.link > div { min-width: 0; }
+.link strong { font-weight: 800; }
+.dot { flex: none; width: 16px; height: 16px; border-radius: 50%; background: #b9c4bd; }
+.dot.live { background: #2bd65e; box-shadow: 0 0 10px #2bd65e; animation: blink 1.6s infinite; }
+.dot.late { background: #ffb020; box-shadow: 0 0 8px #ffb020; }
+.dot.off { background: var(--bad); }
+@keyframes blink { 50% { opacity: .55; } }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.badge { font-size: 12px; font-weight: 800; border-radius: 99px; padding: 2px 10px; background: var(--track); color: #6b7f70; }
+.badge.on { background: linear-gradient(#ffe88a, #ffc531); color: var(--ink); box-shadow: 0 0 10px #ffd76a; }
+@media (prefers-reduced-motion: reduce) { .dot.live, .tag.readytag { animation: none; } .fan { animation: none; } }
+.side { display: grid; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 3px solid var(--leaf-deep); border-radius: 14px; padding: 10px 12px; min-width: 0; }
+.card h2 { font-family: var(--display); font-size: 18px; font-weight: 800; margin: 0 0 6px; color: var(--leaf-deep); text-wrap: balance; }
+.acct { padding: 8px 0; border-top: 2px dashed var(--line); display: grid; gap: 4px; }
+.acct:first-of-type { border-top: 0; padding-top: 0; }
+.acct header { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.acct strong { font-weight: 800; }
+.acct em { font-style: normal; font-family: var(--display); font-weight: 800; font-size: 19px; font-variant-numeric: tabular-nums; }
+.lvl { display: inline-block; font-family: var(--display); font-weight: 800; font-size: 13px; color: #fff; background: var(--leaf); border-radius: 8px; padding: 0 8px; width: fit-content; }
+.lvl.ready { background: var(--sun); color: var(--ink); } .lvl.bust { background: var(--bad); }
+.meter { font-size: 13px; color: var(--muted); font-weight: 800; }
+.bar { height: 11px; background: var(--track); border-radius: 99px; overflow: hidden; margin-top: 2px; }
+.bar i { display: block; height: 100%; background: var(--sun-deep); border-radius: 99px; transition: width .6s; }
+.bar.water i { background: var(--water); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; max-height: 280px; overflow-y: auto; }
+.feed li { font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.feed time { color: var(--muted); font-size: 12px; font-weight: 800; margin-right: 4px; }
+.pill { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 99px; padding: 0 7px; color: #fff; background: var(--leaf); margin-right: 4px; }
+.pill.no { background: var(--bad); } .pill.mid { background: #9a6204; }
+.inspect p { margin: 4px 0; line-height: 1.35; overflow-wrap: anywhere; }
+.inspect dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0 0; font-size: 14px; }
+.inspect dt { color: var(--muted); } .inspect dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; }
+button { font-family: var(--display); font-weight: 800; font-size: 15px; color: #fff; background: var(--leaf); border: 0; border-radius: 12px; padding: 6px 16px; box-shadow: 0 4px 0 var(--leaf-deep); cursor: pointer; }
+button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--leaf-deep); }
+button:focus-visible, canvas:focus-visible { outline: 3px solid var(--sun-deep); outline-offset: -3px; }
+button.gold { background: var(--sun); color: var(--ink); box-shadow: 0 4px 0 var(--sun-deep); }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; align-self: center; }
+.fresh { font-size: 12px; font-weight: 800; color: var(--muted); }
+@media (max-width: 700px) { .stage { aspect-ratio: 1 / 1.05; } .tag.sign { font-size: 12px; } .tag.readytag { font-size: 15px; } .hint { display: none; } }
+@media (max-width: 980px) { .main { grid-template-columns: minmax(0, 1fr); } .brand { width: 100%; } .stat { flex: 1 1 130px; min-width: 0; } .stat.wx { flex: 1 1 100%; } }
+</style>
+
+</head><body>
+<div class="wrap">
+  <header class="hud">
+    <div class="brand">Harvest Desk<small id="modeLabel">PAPER · watch-only · no orders</small></div>
+    <div class="stat"><b id="today">$0</b><span>Today's crop</span></div>
+    <div class="stat"><b id="silo">$0</b><span>In the silo · last 60 days</span></div>
+    <div class="stat"><b id="streak">0</b><span>Win streak</span></div>
+    <div class="stat wx"><b id="wx">Checking the sky</b><span id="wxsub">Weather follows today's paper P&amp;L</span></div>
+    <div class="controls">
+      <button id="demoBtn" class="gold" type="button">Play demo season</button>
+      <button id="refreshBtn" type="button">Refresh</button>
+      <span class="fresh" id="fresh"></span>
+    </div>
+  </header>
+  <div class="banner demo" id="demoBanner" hidden>DEMO — sample trades only, not actual fills or an eval result. Press Back to my farm to leave.</div>
+  <div class="banner ready" id="readyBanner" hidden></div>
+  <div class="banner" id="banner" hidden><span id="bannerText"></span><button id="bannerBtn" type="button" hidden>Allow live data</button></div>
+  <div class="main">
+    <div class="stage" id="stage">
+      <canvas id="c" tabindex="0" aria-label="3D farm. Drag to spin it, scroll or pinch to zoom, and tap a farmer, a field or a building for details."></canvas>
+      <div id="tags" aria-hidden="true"></div>
+      <div class="stagebar">
+        <button id="soundBtn" class="mini" type="button">Sound off</button>
+        <button id="followBtn" class="mini" type="button" data-on="1">Follow on</button>
+      </div>
+      <div class="hint">Drag to spin · Scroll to zoom · Tap anything</div>
+      <div id="fan" class="fan" hidden><b id="fanTitle"></b><span id="fanSub"></span></div>
+      <div id="toast" class="toastbox" hidden></div>
+      <div id="no3d" class="banner" hidden>3D didn't load in this view. Your numbers on the right are still live.</div>
+    </div>
+    <aside class="side">
+      <section class="card"><h2>Grokbot alert activity</h2><div class="link"><i id="linkDot" class="dot off"></i><div><strong id="linkTitle">Checking</strong><p class="note" id="linkSub"></p></div></div></section>
+      <section class="card"><h2>Two Lucid 25k PAPER accounts</h2><div id="evalBar"></div><p class="note">Official LucidPro 25k: target $1,250 · max loss $1,000 · official daily loss limit none · max 2 mini or 20 micros (support.lucidtrading.com, checked 12 Nov 2026). Your approved daily stop is $400, which is not a Lucid official limit. Both accounts will run the same MGC v5 bot. Neither is live — the meters show the shared Grokbot MGC v5 paper record as a preview, not two funded ledgers or a pass certificate. Open equity, session boundaries, consistency and trailing rules are not verified here.</p></section>
+      <section class="card"><h2>Strategy fields</h2><div id="accts"></div></section>
+      <section class="card"><h2>Farm badges</h2><div class="badges" id="badges"></div></section>
+      <section class="card inspect" aria-live="polite"><h2 id="iTitle">Tap anything on the farm</h2><div id="iBody"><p>Farmers are your agents, fields are your accounts, and every crate of crop is money coming in.</p></div></section>
+      <section class="card"><h2>Farm log</h2><ul class="feed" id="feed"></ul></section>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/GammaCorrectionShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/Pass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/MaskPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+"use strict";
+const FEED_URL = "https://ixnsyxloeijmlzujsvnm.supabase.co/functions/v1/harvest-feed";
+const POLL_MS = 45000;
+const LUCID_25K_RULES = { start: 25000, eval_target: 1250, drawdown: 1000, daily_loss: 400 };
+const FIELD_RULES = { start: 0, eval_target: 1250, drawdown: 1e12, daily_loss: 1e12 };
+const DEFAULT_RULES = FIELD_RULES;
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+const money = (v) => (v < 0 ? "-$" : "$") + Math.abs(Math.round(v)).toLocaleString("en-GB");
+const signed = (v) => (v > 0 ? "+" : "") + money(v);
+const etDate = (ms) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+const ukTime = (ts) => new Date(ts).toLocaleTimeString("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit" });
+const sleep = (ms) => new Promise((r) => setTimeout(r, reduced ? Math.min(ms, 80) : ms));
+
+/* LEVEL LOGIC */
+// Works out where an account stands from its closed trades, using the firm's rules.
+// Illustrative realised-paper progress only; no funded state or withdrawals.
+function progressOf(days, r) {
+  const profit = days.reduce((sum,d)=>sum+d.pnl,0);
+  let balance=r.start, peak=r.start, maxDD=0;
+  for(const d of days){ balance+=d.pnl; peak=Math.max(peak,balance); maxDD=Math.max(maxDD,peak-balance); }
+  const bust=maxDD>=r.drawdown || days.some(d=>d.pnl<=-r.daily_loss);
+  const passed=profit>=r.eval_target && !bust;
+  return {balance, floor:peak-r.drawdown, room:Math.max(0,r.drawdown-(peak-balance)),roomPct:Math.max(0,1-(peak-balance)/r.drawdown),profit,pct:Math.max(0,Math.min(1,profit/r.eval_target)),bust,level:passed?2:1,ready:false,stage:passed?"paper_target":"eval",goal:`${money(profit)} / ${money(r.eval_target)} PAPER target`};
+}
+function daysOf(trades) {
+  const m = new Map();
+  for (const t of trades) if (t.status === "closed") { const k = t.dayKey; m.set(k, (m.get(k) || 0) + (t.pnl || 0)); }
+  return [...m.keys()].sort().map((day) => ({ day, pnl: m.get(day) }));
+}
+/* END LEVEL LOGIC */
+
+// ---- World, in isometric grid units
+const wp = (x, y, z = 0) => new THREE.Vector3(x - 10, z, y - 10);
+const SLOTS = [{ x: 2, y: 9, w: 5, d: 4 }, { x: 2, y: 15, w: 4, d: 3 }, { x: 9, y: 12, w: 5, d: 4 }, { x: 14, y: 6, w: 4, d: 4 }];
+const LOCKED = [];
+const SPOTS = { silo: [17, 13.8], house: [10.5, 7.2], tower: [5.8, 4.8], gate: [8, 10], home: [14.5, 11.2] };
+const TREES = [[1, 1.5], [6, 1], [14, 1.2], [18.5, 5], [18.6, 10.5], [1, 6.5], [18.2, 18], [7.2, 17.5], [12, 18.2], [.9, 13.8]];
+
+function blankAccount(row, i) { return { ...SLOTS[i], id: row.id, name: row.name, firm: row.firm, crop: row.crop, rules: row.rules || DEFAULT_RULES, trades: [], p: progressOf([], row.rules || DEFAULT_RULES), openTile: -1, shownPct: 0 }; }
+const FIELD_ROWS = [
+  {id:"orb5",name:"ORB5 MNQ",firm:"PAPER · MNQ · real fills only",crop:"corn",rules:FIELD_RULES},
+  {id:"orb5_room",name:"ORB5 Room MNQ",firm:"PAPER · MNQ · real fills only",crop:"corn",rules:FIELD_RULES},
+  {id:"orb5_gold",name:"ORB5 Gold",firm:"PAPER · MGC · real fills only",crop:"wheat",rules:FIELD_RULES},
+  {id:"mgc",name:"MGC v5 Gold",firm:"PAPER · MGC v5 · not live on Lucid",crop:"wheat",rules:FIELD_RULES}
+];
+let accounts = FIELD_ROWS.map(blankAccount);
+
+// ---- Farmers
+const mkFarmer = (key, name, role, shirt, overalls, skin, x, y, blurb) => ({ key, name, role, shirt, overalls, skin, x, y, tx: x, ty: y, speed: 3.4, flip: 1, blurb, say: "", sayT: 0, carry: null, res: null, asleep: false, nextWander: 0 });
+const farmers = {
+  scout: mkFarmer("scout", "Scout", "Watches ORB5 alerts", "#ffb347", "#3d6fb5", "#8d5a3c", 7.6, 8, "Represents TradingView signals recorded by Grokbot. This dashboard only reads paper fills; it cannot send alerts or place orders."),
+  checker: mkFarmer("checker", "Checker", "Represents the risk gate", "#f4f4f4", "#2b7a78", "#e8b88f", SPOTS.gate[0], SPOTS.gate[1], "Represents the existing Grokbot risk gate. The dashboard does not change or enforce any trading rules."),
+  picker: mkFarmer("picker", "Executioner", "Plants and harvests", "#e0483e", "#35527d", "#c98a5e", SPOTS.home[0], SPOTS.home[1], "Plants approved trades and brings in the crop. Paper fills only: there's no broker connection, so this farmer can't place a real order."),
+  chief: mkFarmer("chief", "Chief of Staff", "Keeps the paper ledger", "#8a5cd6", "#4b3a2a", "#6f4630", SPOTS.house[0], SPOTS.house[1], "Displays the paper record. No reports, routines or trading actions are triggered by this page."),
+  researcher: mkFarmer("researcher", "Researcher", "Not set up yet", "#17a7a0", "#6b4d2e", "#f0c8a0", SPOTS.tower[0], SPOTS.tower[1], "Decorative only. The farm weather reflects realised paper P&L, not a gamma forecast."),
+};
+farmers.researcher.asleep = true;
+const go = (b, x, y) => new Promise((res) => { b.tx = x; b.ty = y; b.res = res; });
+const say = (b, text, ms = 2200) => { b.say = text; b.sayT = performance.now() + ms; };
+
+// ---- State
+let view = { brief: null, risk: null, signals: [], report: null };
+let totalsNow = { today: 0, silo: 0 }, shownToday = 0, shownSilo = 0, demo = false, runTok = 0, lastReal = null, seenSig = new Set(), first = true;
+const queue = []; let queueBusy = false;
+function enqueue(fn) { queue.push(fn); pump(); }
+async function pump() { if (queueBusy) return; queueBusy = true; while (queue.length) { try { await queue.shift()(); } catch (e) { console.log(e); } } queueBusy = false; }
+
+function norm(t) {
+  const ts = t.exit_time || t.alert_time || t.day;
+  return { id: t.id, side: t.side, qty: t.qty, level: t.level ?? "ORB5", symbol:t.ticker || "", entry: Number(t.entry_price), exit: t.exit_price == null ? null : Number(t.exit_price), status: t.status, reason: t.exit_reason, pnl: t.pnl_usd == null ? null : Number(t.pnl_usd), tier: t.tier, when: ts, dayKey: t.day ?? etDate(new Date(ts).getTime()) };
+}
+function tileFor(a, seed) { return Math.abs(seed * 7) % (a.w * a.d); }
+
+function setTrades(a, list, animate) {
+  const before = new Map(a.trades.map((t) => [t.id, t.status]));
+  const prevP = a.p;
+  if (animate) for (const t of list) {
+    const was = before.get(t.id);
+    if (was === undefined) enqueue(() => animOpen(a, t));
+    if (t.status === "closed" && was !== "closed") enqueue(() => animClose(a, t));
+    if (t.status === "stale" && was !== "stale") enqueue(async () => say(farmers.picker, "No exit alert"));
+  }
+  a.trades = list;
+  a.p = progressOf(daysOf(list), a.rules);
+  
+  if (!animate) a.shownPct = a.p.pct;
+  const open = list.find((t) => t.status === "open");
+  a.openTile = open ? tileFor(a, open.id) : -1;
+}
+let combinedPrevious = progressOf([],LUCID_25K_RULES);
+function mgcDays(){ const a=accounts.find(x=>x.id==="mgc"); return daysOf(a?a.trades:[]); }
+function checkMilestone() {
+  const p=progressOf(mgcDays(),LUCID_25K_RULES);
+  if(p.level>combinedPrevious.level) enqueue(async()=>{ celebrate("PAPER target reached!","Illustration only — MGC v5 paper preview, no live Lucid account passed",accounts.find(x=>x.id==="mgc")||accounts[0]); await sleep(2500); });
+  if(p.bust && !combinedPrevious.bust) enqueue(async()=>{showFanfare("Storm warning","PAPER MGC v5 preview against the $400 daily stop or $1,000 max loss — not a live breach",true); await sleep(2000);});
+  combinedPrevious=p;
+}
+function celebrate(title, sub, a) {
+  showFanfare(title, sub); sfx.fanfare();
+  if (window.THREE && scene) { const at = a ? wp(a.x + a.w / 2, a.y + a.d / 2) : new THREE.Vector3(); focusOn(at); fireworks(at); }
+}
+
+function applyFarm(farm, animate) {
+  lastReal = farm;
+  if (demo) return;
+  if (Array.isArray(farm.accounts) && farm.accounts.length) {
+    const rows = farm.accounts.slice(0, SLOTS.length);
+    if (rows.some((r, i) => accounts[i]?.id !== r.id)) { accounts = rows.map(blankAccount); }
+    else rows.forEach((r, i) => Object.assign(accounts[i], { name: r.name, firm: r.firm, crop: r.crop, rules: r.rules }));
+  }
+  for (const a of accounts) setTrades(a, (farm[a.id] || []).map(norm).sort((p, q) => p.id - q.id), animate);
+  view.brief = farm.brief; view.beat = farm.beat; linkKnown = true; view.risk = farm.risk; view.report = farm.report; view.signals = farm.signals || []; view.strategies = farm.strategies || {}; view.prop_accounts = farm.prop_accounts || [];
+  for (const s of view.signals) { if (seenSig.has(s.id)) continue; seenSig.add(s.id); if (animate && !s.approved) enqueue(() => animReject(s.reasons?.[0] || "Rejected")); }
+  if(animate) checkMilestone(); else combinedPrevious=progressOf(mgcDays(),LUCID_25K_RULES);
+  refreshPanels();
+}
+
+function computeTotals() {
+  const today = etDate(Date.now()); let t = 0, s = 0;
+  for (const a of accounts) for (const tr of a.trades) if (tr.status === "closed") { s += tr.pnl || 0; if (tr.dayKey === today) t += tr.pnl || 0; }
+  totalsNow = { today: t, silo: s };
+}
+function weather() {
+  if(demo) return {key:"positive",text:"DEMO sunshine",sub:"Sample trades only"};
+  if(feedError) return {key:"unknown",text:"Feed unavailable",sub:"No new paper data confirmed"};
+  const p=totalsNow.today;
+  return p<0?{key:"negative",text:"Stormy paper day",sub:"Weather = realised paper P&L"}:p>0?{key:"positive",text:"Sunny paper day",sub:"Weather = realised paper P&L"}:{key:"unknown",text:"Quiet farm",sub:"Waiting for genuine paper trades"};
+}
+function meter(labelText, pct, cls) {
+  const m = document.createElement("div"); m.className = "meter"; m.textContent = labelText;
+  const b = document.createElement("div"); b.className = "bar " + (cls || ""); const i = document.createElement("i"); i.style.width = Math.round(pct * 100) + "%"; b.append(i); m.append(b); return m;
+}
+let linkKnown = false, earned = new Set();
+function renderLink() {
+  const set=(cls,title,sub)=>{ $("linkDot").className="dot "+cls; $("linkTitle").textContent=title; $("linkSub").textContent=sub; };
+  if(demo) return set("live","DEMO activity","Sample only — not connected to an account.");
+  if(feedError) return set("late","Feed unavailable","Last good values may be stale. This is not an execution-health monitor.");
+  if(!linkKnown) return set("late","Checking paper feed","Reads Grokbot only. No orders.");
+  const t=view.beat?.at;
+  const detail=t?"Last alert "+new Date(t).toLocaleString("en-GB",{timeZone:"Europe/London"})+" UK":"No genuine alert recorded";
+  if(closedMarket()) return set("","Market closed",detail+". Scheduled US RTH; holidays not checked.");
+  if(!t || etDate(Date.parse(t))!==etDate(Date.now())) return set("off","No alerts today",detail);
+  if(Date.now()-Date.parse(t)>600000) return set("late","Quiet since last alert",detail+". ORB5 is sparse; silence need not mean a fault.");
+  set("live","Recent Grokbot alert",detail+". Not proof of real-time data or broker connectivity.");
+}
+function renderBadges() {
+  const closed = accounts.flatMap((a) => a.trades.filter((t) => t.status === "closed").map((t) => ({ ...t, a }))).sort((p, q) => new Date(p.when) - new Date(q.when));
+  let run = 0, best = 0; for (const t of closed) { run = t.pnl > 0 ? run + 1 : 0; best = Math.max(best, run); }
+  $("streak").textContent = run;
+  const dayMax = Math.max(0, ...accounts.flatMap((a) => daysOf(a.trades).map((d) => d.pnl)));
+  const list = [["First crop", closed.some((t) => t.pnl > 0)], ["3 in a row", best >= 3], ["5 in a row", best >= 5], ["$500 day", dayMax >= 500], ["PAPER target", progressOf(mgcDays(),LUCID_25K_RULES).level >= 2], ["$5,000 silo", totalsNow.silo >= 5000]];
+  const box = $("badges"); box.textContent = "";
+  for (const [name, on] of list) {
+    const el = document.createElement("span"); el.className = "badge" + (on ? " on" : ""); el.textContent = name; box.append(el);
+    if (on && !earned.has(name)) { if (!first || demo) { toast(`New badge: ${name}`); sfx.coin(); } earned.add(name); }
+  }
+}
+function refreshPanels() {
+  computeTotals(); renderBadges(); renderLink();
+  const w = weather(); $("wx").textContent = w.text; $("wxsub").textContent = w.sub;
+  const box = $("accts"); box.textContent = "";
+  for (const a of accounts) {
+    const p = a.p, closed = a.trades.filter((t) => t.status === "closed"), pnl = closed.reduce((s, t) => s + (t.pnl || 0), 0), wins = closed.filter((t) => t.pnl > 0).length;
+    const row = document.createElement("div"); row.className = "acct";
+    const head = document.createElement("header"); const n = document.createElement("strong"); n.textContent = a.name;
+    const e = document.createElement("em"); e.textContent = signed(pnl); e.className = pnl > 0 ? "pos" : pnl < 0 ? "neg" : ""; head.append(n, e);
+    const lv = document.createElement("span"); lv.className = "lvl" + (p.ready ? " ready" : p.bust ? " bust" : "");
+    lv.textContent = "PAPER strategy field";
+    row.append(head, lv);
+    const s = document.createElement("p"); s.className = "note";
+    const st=view.strategies?.[a.id];
+    const alert=st?.last_alert_at?" · last alert "+new Date(st.last_alert_at).toLocaleString("en-GB",{timeZone:"Europe/London"})+" UK":"";
+    const openN=(st?.open_positions||a.trades.filter(t=>t.status==="open")).length;
+    const today=st?st.today_pnl:closed.filter(t=>t.dayKey===etDate(Date.now())).reduce((x,t)=>x+(t.pnl||0),0);
+    s.textContent = `${a.firm}. Today ${signed(today)}. ${closed.length ? `${closed.length} trades, ${Math.round(wins / closed.length * 100)}% wins` : "No fills yet"}${openN?` · ${openN} open`:""}${alert}`;
+    row.append(s); box.append(row);
+  }
+  const mgcP=progressOf(mgcDays(),LUCID_25K_RULES);
+  const mgcToday=(view.strategies?.mgc?.today_pnl) ?? 0;
+  const eb=$("evalBar"); eb.textContent="";
+  for(const n of [1,2]){
+    const wrap=document.createElement("div"); wrap.style.margin="0 0 12px";
+    const h=document.createElement("strong"); h.textContent="Lucid 25k #"+n+" · MGC v5 · PAPER (not live)";
+    wrap.append(h, meter(mgcP.goal+" (shared paper preview)",mgcP.pct), meter(`Max loss room (estimate): ${money(mgcP.room)} / $1,000`,mgcP.roomPct,"water"), meter(`Your $400 daily stop: ${money(Math.max(0,-mgcToday))} / $400`,Math.min(1,Math.max(0,-mgcToday)/400)));
+    eb.append(wrap);
+  }
+  const rb = $("readyBanner"), readyA = [];
+  rb.hidden = true; rb.textContent = "";
+  const feed = $("feed"); feed.textContent = ""; const items = [];
+  for (const s of view.signals) items.push({ ts: s.created_at, pill: s.approved ? "Stamped" : "Rejected", cls: s.approved ? "" : "no", text: `${s.side === "buy" ? "Long" : "Short"} ${s.level}${s.approved ? `, ${s.qty} contracts` : ": " + (s.reasons || []).join(", ")}` });
+  for (const a of accounts) for (const t of a.trades.slice(-10)) {
+    if (t.status === "closed") items.push({ ts: t.when, pill: t.pnl > 0 ? "Crop in" : "Crow", cls: t.pnl > 0 ? "" : "no", text: `${a.name} ${t.symbol || ""} ${signed(t.pnl)} (${t.reason || "exit"})` });
+    else if (t.status === "open") items.push({ ts: t.when, pill: "Planted", cls: "mid", text: `${a.name}: ${t.side === "buy" ? "long" : "short"} ${t.qty} at ${t.entry}` });
+    else items.push({ ts: t.when, pill: "Weeds", cls: "mid", text: `${a.name}: no exit alert came through, left out of the money` });
+  }
+  items.sort((p, q) => new Date(q.ts) - new Date(p.ts));
+  if (!items.length) { const li = document.createElement("li"); li.textContent = "The farm is waiting for genuine Grokbot paper fills. Only recorded fills are shown. Try DEMO to see it grow."; feed.append(li); }
+  for (const it of items.slice(0, 16)) {
+    const li = document.createElement("li"), tm = document.createElement("time"), p = document.createElement("span");
+    tm.textContent = String(it.ts).length <= 10 ? "" : ukTime(it.ts)+" UK"; p.className = "pill " + it.cls; p.textContent = it.pill;
+    li.append(tm, p, document.createTextNode(it.text)); feed.append(li);
+  }
+}
+
+// ---- Animations
+const plotPos = (a, i) => ({ x: a.x + (i % a.w) + .5, y: a.y + Math.floor(i / a.w) + .5 });
+async function animOpen(a, t) {
+  const tok = runTok, p = plotPos(a, tileFor(a, t.id)), s = farmers.scout, c = farmers.checker, h = farmers.picker;
+  focusOn(wp(p.x, p.y, .4));
+  await go(s, p.x, a.y - .7); if (tok !== runTok) return;
+  say(s, `${t.level} signal!`, 1400); await sleep(demo ? 450 : 900); if (tok !== runTok) return;
+  say(c, "Stamped", 1200); sfx.stamp(); await sleep(demo ? 400 : 900); if (tok !== runTok) return;
+  await go(h, p.x, p.y); if (tok !== runTok) return;
+  say(h, `Planting ${t.qty}`, 1200); sfx.plink(); emit(wp(p.x, p.y, .6), 16, "#a8ffa0", 1.5); await sleep(demo ? 300 : 700);
+}
+async function animClose(a, t) {
+  const tok = runTok, p = plotPos(a, tileFor(a, t.id)), h = farmers.picker;
+  await go(h, p.x, p.y); if (tok !== runTok) return;
+  if (t.pnl > 0) {
+    say(h, "Picked!", 900); h.carry = a.crop; sfx.plink(); emit(wp(p.x, p.y, 1), 34, "#ffe14d", 3.2); await sleep(demo ? 200 : 600);
+    await go(h, ...SPOTS.silo); if (tok !== runTok) return;
+    h.carry = null; sfx.coin(); coinBurst(wp(SPOTS.silo[0], SPOTS.silo[1], 1.4), t.pnl); focusOn(new THREE.Vector3(6, 1, 3)); await sleep(demo ? 500 : 900); floatText(new THREE.Vector3(8.6, 4.4, 4.6), signed(t.pnl), "");
+  } else {
+    const cp = wp(p.x, p.y, 1); spawnCrow(cp); sfx.crow();
+    await sleep(demo ? 600 : 1100); if (tok !== runTok) return;
+    emit(cp, 20, "#7a5a3a", 1.8); floatText(cp.clone().setY(1.8), signed(t.pnl), "loss"); say(h, "Crow got that one", 1200);
+  }
+  refreshPanels(); await sleep(demo ? 150 : 500);
+}
+async function animReject(reason) { sfx.stamp(); emit(new THREE.Vector3(-2, 1.4, 0), 12, "#ff7a6a", 1.6); say(farmers.checker, "Rejected: " + String(reason).slice(0, 34), 2600); await sleep(demo ? 900 : 1600); }
+
+// ---- Demo: a sped-up season from eval to harvest, on sample numbers
+const DEMO_SEASON = [525, -175, 525, 525, -175, 525, 525, 525, 525];
+function clearFarm() { for(const f of Object.values(farmers)){ if(f.res){f.res();f.res=null;} } for (const a of accounts) { a.trades = []; a.p = progressOf([], a.rules); a.openTile = -1; a.shownPct = 0; } queue.length = 0; farmers.picker.carry = null; earned = new Set(); }
+async function startDemo() {
+  demo = true; $("modeLabel").textContent="DEMO · sample trades · NOT REAL"; combinedPrevious=progressOf([],LUCID_25K_RULES); const tok = ++runTok; clearFarm();
+  $("demoBanner").hidden = false; $("demoBtn").textContent = "Back to my farm";
+  const signals = []; view.signals = signals; view.report = null; refreshPanels();
+  const a = accounts[0], b = accounts[1]; let id = 1, day = 1;
+  const levels = ["ORB5 DEMO"];
+  for (const step of DEMO_SEASON) {
+    if (tok !== runTok) return;
+    const stamp = new Date().toISOString();
+    if (Array.isArray(step)) { signals.unshift({ id: id++, created_at: stamp, side: "buy", level: "PDL", approved: false, reasons: [step[1]] }); refreshPanels(); await animReject(step[1]); continue; }
+    const t = { id: id++, side: id % 2 ? "buy" : "sell", qty: 5, level: levels[0], entry: 25000, exit: null, status: "open", reason: null, pnl: null, when: stamp, dayKey: etDate(Date.now()) };
+    a.trades = [...a.trades, t]; a.openTile = tileFor(a, t.id); refreshPanels();
+    await animOpen(a, t); if (tok !== runTok) return;
+    await sleep(350); if (tok !== runTok) return;
+    t.status = "closed"; t.pnl = step; t.reason = step > 0 ? "target" : "stop"; t.exit = 25000 + step / 10; t.when = new Date().toISOString(); a.openTile = -1;
+    const prev = a.p; await animClose(a, t); if (tok !== runTok) return;
+    a.p = progressOf(daysOf(a.trades), a.rules); checkMilestone(a, prev); refreshPanels();
+    if (false) { const g = { id: id++, side: "buy", qty: 3, level: "Opening range", entry: 25000, exit: 25040, status: "closed", reason: "target", pnl: 238, when: new Date().toISOString(), dayKey: t.dayKey }; b.trades = [...b.trades, g]; b.p = progressOf(daysOf(b.trades), b.rules); refreshPanels(); }
+    await new Promise((r) => { const w = () => (queueBusy ? setTimeout(w, 80) : r()); w(); });
+    if (tok !== runTok) return;
+  }
+  // Stay visibly in DEMO until the user chooses Back to my farm.
+  if(tok===runTok) toast("DEMO complete — sample results only");
+}
+function stopDemo() {
+  demo = false; $("modeLabel").textContent="PAPER · watch-only · no orders"; runTok++; clearFarm(); $("demoBanner").hidden = true; $("demoBtn").textContent = "Play demo season";
+  view.signals = []; for (const f of [farmers.scout, farmers.picker]) f.res = null;
+  farmers.picker.tx = SPOTS.home[0]; farmers.picker.ty = SPOTS.home[1];
+  if (lastReal) applyFarm(lastReal, false); else refreshPanels(); fetchFarm();
+}
+$("demoBtn").addEventListener("click", () => (demo ? stopDemo() : startDemo()));
+
+// ---- Read-only HTTP data. No browser secrets, SQL or connector dependency.
+let polling=null, inFlight=false, feedError=false;
+function setBanner(text) { $("banner").hidden=!text; $("bannerText").textContent=text || ""; $("bannerBtn").hidden=true; }
+function toFarm(f) {
+  if(f.mode!=="PAPER" || !Array.isArray(f.trades)) throw new Error("Invalid paper feed");
+  const list=f.trades.map(t=>({id:t.id,alert_time:t.entry_time,exit_time:t.exit_time,entry_price:t.entry_price,exit_price:t.exit_price,qty:t.contracts,side:t.side,status:t.status,exit_reason:t.exit_reason,pnl_usd:t.pnl,level:t.setup || t.strategy,ticker:t.symbol,strategy:t.strategy}));
+  const by=Object.fromEntries(FIELD_ROWS.map(r=>[r.id,[]]));
+  for(const t of list){ (by[t.strategy] && by[t.strategy].push(t)); }
+  return {now:f.now,accounts:FIELD_ROWS,...by,beat:f.latest_log_at?{at:f.latest_log_at}:null,brief:null,risk:null,signals:[],report:null,prop_accounts:f.prop_accounts||[],strategies:f.strategies||{}};
+}
+async function fetchFarm(){
+  if(inFlight || demo) return;
+  inFlight=true;
+  try {
+    const res=await fetch(FEED_URL,{method:"GET",cache:"no-store",signal:AbortSignal.timeout(12000)});
+    if(!res.ok) throw new Error("Feed unavailable");
+    const farm=toFarm(await res.json()); feedError=false;
+    applyFarm(farm,!first); first=false;
+    $("fresh").textContent="Updated "+ukTime(farm.now)+" UK";
+    setBanner("");
+  } catch(e){
+    feedError=true; $("fresh").textContent="Feed unavailable · values not current";
+    setBanner(lastReal?"Connection lost — showing last confirmed PAPER data. Use Refresh to retry.":"PAPER feed is not available yet. No trades have been loaded. DEMO still works.");
+    refreshPanels();
+  } finally {inFlight=false;}
+}
+$("refreshBtn").addEventListener("click",fetchFarm);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden) fetchFarm();});
+// Wait until the complete script has initialised the 3D world and market-hours helper.
+setTimeout(()=>{
+  refreshPanels();
+  if(new URLSearchParams(location.search).get("demo")==="1") startDemo(); else fetchFarm();
+  polling=setInterval(()=>{if(!document.hidden){ if(!demo) fetchFarm(); renderLink(); }},POLL_MS);
+},0);
+
+// ---- Inspector
+function inspect(title, paras, rows) {
+  $("iTitle").textContent = title; const b = $("iBody"); b.textContent = "";
+  for (const p of paras) { const el = document.createElement("p"); el.textContent = p; b.append(el); }
+  if (rows) { const dl = document.createElement("dl"); for (const [k, v] of rows) { const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = k; dd.textContent = v; dl.append(dt, dd); } b.append(dl); }
+}
+function inspectField(a) {
+  const open=a.trades.find(t=>t.status==="open");
+  const st=view.strategies?.[a.id];
+  const lines=["Read-only PAPER strategy field, not a Lucid account. Last 60 days, realised fills only.",open?`Growing: ${open.side} ${open.qty} at ${open.entry}`:"No open recorded trade."];
+  if(st?.last_alert_at) lines.push("Last alert "+new Date(st.last_alert_at).toLocaleString("en-GB",{timeZone:"Europe/London"})+" UK");
+  inspect(a.name,lines,[["Source",a.firm],["Trades",a.trades.length],["Today",money(st?st.today_pnl:0)],["Silo",money(st?st.running_total:a.trades.filter(t=>t.status==="closed").reduce((x,t)=>x+(t.pnl||0),0))]]);
+}
+function inspectBrief(){ inspect("Farm weather",["Decorative weather based on today's realised paper P&L. Not a forecast, gamma calculation, or trading signal."]); }
+// ---- 3D world
+const cv = $("c"), stage = $("stage"), tagLayer = $("tags");
+let gl3 = null;
+const closedMarket = () => {
+  const p = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  const g = (k) => p.find((x) => x.type === k)?.value, m = Number(g("hour")) * 60 + Number(g("minute"));
+  return ["Sat", "Sun"].includes(g("weekday")) || m < 570 || m >= 960;
+};
+
+// Sound stays off until the viewer turns it on.
+let audio = null;
+function tone(freq, at, len = .22, type = "triangle", vol = .12) {
+  if (!audio) return;
+  const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + at;
+  o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .015); g.gain.exponentialRampToValueAtTime(.0001, t + len);
+  o.connect(g).connect(audio.destination); o.start(t); o.stop(t + len + .02);
+}
+const sfx = {
+  plink: () => tone(1320, 0, .12), coin: () => [988, 1319].forEach((f, i) => tone(f, i * .07, .18)), crow: () => { tone(180, 0, .25, "sawtooth", .07); tone(140, .16, .25, "sawtooth", .07); },
+  fanfare: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * .12, .4)), stamp: () => tone(220, 0, .09, "square", .06),
+};
+$("soundBtn").addEventListener("click", () => {
+  if (audio) { audio.close(); audio = null; $("soundBtn").textContent = "Sound off"; return; }
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); $("soundBtn").textContent = "Sound on"; sfx.coin(); } catch { $("soundBtn").textContent = "No sound here"; }
+});
+
+// Screen-space labels sit in the DOM so text stays crisp.
+const tags = [];
+function makeTag(cls, text) { const el = document.createElement("div"); el.className = "tag " + cls; el.textContent = text || ""; tagLayer.append(el); return el; }
+const v3 = () => new THREE.Vector3();
+function place(el, pos, dy = 0) {
+  const p = pos.clone().project(camera), r = lastSize;
+  if (p.z > 1) { el.style.display = "none"; return null; }
+  el.style.display = "";
+  const x = (p.x + 1) / 2 * r.w, y = (1 - p.y) / 2 * r.h + dy;
+  el.style.transform = `translate(calc(${Math.round(x)}px - 50%), calc(${Math.round(y)}px - 50%))`;
+  return { x, y };
+}
+const floats = [];
+function floatText(pos, text, cls) { const el = makeTag("float " + cls, text); floats.push({ el, pos: pos.clone(), life: 110 }); }
+let fanTimer = 0;
+function showFanfare(title, sub, bad) { $("fanTitle").textContent = title; $("fanSub").textContent = sub; $("fan").className = "fan" + (bad ? " bad" : ""); $("fan").hidden = false; clearTimeout(fanTimer); fanTimer = setTimeout(() => { $("fan").hidden = true; }, 3400); }
+let toastTimer = 0;
+function toast(text) { $("toast").textContent = text; $("toast").hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { $("toast").hidden = true; }, 3600); }
+
+let renderer, scene, camera, controls, composer, bloom, sun, hemi, moon, skyMat, waterMat, stars, winMat, globeMat, sparks, rainLines, lastSize = { w: 1, h: 1 };
+let cropSets = [], beams = [], coinMesh, clouds = [], smoke = [], mill, cups, siloGauge, crowsLive = [], fireflies = [];
+const coins = [], dummy = () => new THREE.Object3D();
+const mood = { day: 1, storm: 0, haze: 0, flash: 0 };
+
+const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: .78, metalness: 0, ...o });
+function mesh(geo, mat, x = 0, y = 0, z = 0, parent) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; (parent || scene).add(m); return m; }
+const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const cyl = (a, b, h, s = 12) => new THREE.CylinderGeometry(a, b, h, s);
+const sph = (r, s = 14) => new THREE.SphereGeometry(r, s, s);
+
+function roundedSquare(half, r) {
+  const s = new THREE.Shape(), h = half;
+  s.moveTo(-h + r, -h); s.lineTo(h - r, -h); s.quadraticCurveTo(h, -h, h, -h + r); s.lineTo(h, h - r); s.quadraticCurveTo(h, h, h - r, h); s.lineTo(-h + r, h); s.quadraticCurveTo(-h, h, -h, h - r); s.lineTo(-h, -h + r); s.quadraticCurveTo(-h, -h, -h + r, -h);
+  return s;
+}
+function grassTexture() {
+  const S = 1536, c = document.createElement("canvas"); c.width = c.height = S; const g = c.getContext("2d"), u = S / 21, X = (v) => (v - 10 + 10.5) * u;
+  g.fillStyle = "#6fc64a"; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 21; i++) { g.fillStyle = i % 2 ? "rgba(255,255,160,.06)" : "rgba(0,70,30,.05)"; g.fillRect(0, i * u, S, u); }
+  for (let i = 0; i < 900; i++) { const x = Math.random() * S, y = Math.random() * S, r = 8 + Math.random() * 46; g.fillStyle = `rgba(${Math.random() > .5 ? "130,220,90" : "60,150,60"},.09)`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  g.strokeStyle = "#dcbb82"; g.lineCap = "round"; g.lineWidth = 1.5 * u; g.beginPath(); g.moveTo(X(7.8), X(0)); g.lineTo(X(7.8), X(20)); g.moveTo(X(0), X(7.8)); g.lineTo(X(20), X(7.8)); g.stroke();
+  for (let i = 0; i < 500; i++) { const a = Math.random() < .5, t = Math.random() * 20, o = (Math.random() - .5) * 1.3; g.fillStyle = Math.random() > .5 ? "rgba(255,240,200,.45)" : "rgba(150,110,60,.35)"; g.beginPath(); g.arc(X(a ? 7.8 + o : t), X(a ? t : 7.8 + o), 2 + Math.random() * 5, 0, 7); g.fill(); }
+  g.setLineDash([u * .4, u * .3]); g.strokeStyle = "rgba(255,255,230,.9)"; g.lineWidth = u * .09;
+  for (const l of LOCKED) { g.fillStyle = "rgba(60,130,60,.35)"; g.fillRect(X(l.x), X(l.y), l.w * u, l.d * u); g.strokeRect(X(l.x), X(l.y), l.w * u, l.d * u); }
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; return t;
+}
+function starTexture() {
+  const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(.25, "rgba(255,255,255,.55)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = "#fff"; g.beginPath(); for (const [a, b] of [[32, 0], [35, 29], [64, 32], [35, 35], [32, 64], [29, 35], [0, 32], [29, 29]]) g.lineTo(a, b); g.fill();
+  return new THREE.CanvasTexture(c);
+}
+
+function buildIsland() {
+  const shape = roundedSquare(10.5, 2.2);
+  const top = new THREE.ShapeGeometry(shape, 24); const t = grassTexture(); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.repeat.set(1 / 21, 1 / 21); t.offset.set(.5, .5);
+  const grass = new THREE.Mesh(top, std("#ffffff", { map: t, roughness: .95 })); grass.rotation.x = -Math.PI / 2; grass.receiveShadow = true; grass.position.y = .03; grass.scale.y = -1; grass.material.side = THREE.DoubleSide; scene.add(grass);
+  const body = new THREE.ExtrudeGeometry(roundedSquare(10.5, 2.2), { depth: 1.1, bevelEnabled: true, bevelSize: .55, bevelThickness: .4, bevelSegments: 4, curveSegments: 18 });
+  const sand = new THREE.Mesh(body, std("#f3dfa4", { roughness: .9 })); sand.rotation.x = Math.PI / 2; sand.position.y = -.5; sand.receiveShadow = true; scene.add(sand);
+  const under = new THREE.Mesh(new THREE.ExtrudeGeometry(roundedSquare(10.6, 2.2), { depth: 3, bevelEnabled: false, curveSegments: 18 }), std("#8a6240")); under.rotation.x = Math.PI / 2; under.position.y = -1.9; scene.add(under);
+  waterMat = new THREE.ShaderMaterial({
+    uniforms: { t: { value: 0 }, day: { value: 1 }, storm: { value: 0 } },
+    vertexShader: "varying vec3 w; void main(){ vec4 p=modelMatrix*vec4(position,1.); w=p.xyz; gl_Position=projectionMatrix*viewMatrix*p; }",
+    fragmentShader: `varying vec3 w; uniform float t,day,storm;
+      void main(){ vec2 p=w.xz; float d=max(abs(p.x),abs(p.y));
+        float r=sin(p.x*.9+t*.7)+sin(p.y*1.1-t*.6)+sin((p.x+p.y)*.6+t);
+        vec3 deep=mix(vec3(.03,.36,.62),vec3(.1,.17,.3),storm), shal=mix(vec3(.16,.83,.86),vec3(.27,.4,.48),storm);
+        vec3 c=mix(shal,deep,smoothstep(11.,24.,d+r*.35));
+        c+=.025*r*vec3(.6,.9,1.);
+        float foam=smoothstep(.34,.0,abs(d-11.75-sin(t*1.1+p.x*.5+p.y*.5)*.16)); c=mix(c,vec3(1.),foam*.75);
+        float g=sin(p.x*3.3+t*1.7+sin(p.y*2.3))*sin(p.y*3.1-t*1.3+cos(p.x*1.9)); c+=pow(max(g,0.),40.)*vec3(.9,.95,.85)*(1.-storm*.7);
+        c*=mix(.32,1.,day); gl_FragColor=vec4(pow(c,vec3(2.2)),1.); }`,
+  });
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), waterMat); water.rotation.x = -Math.PI / 2; water.position.y = -.7; scene.add(water);
+}
+
+function buildField(a) {
+  const n = a.w * a.d, soil = std("#8d5730", { roughness: 1 }), cx = a.x + a.w / 2 - 10, cz = a.y + a.d / 2 - 10;
+  mesh(box(a.w + .4, .16, a.d + .4), std("#6a4022"), cx, .08, cz);
+  const dm = dummy(), mounds = new THREE.InstancedMesh(new THREE.BoxGeometry(.84, .14, .84), soil, n); mounds.castShadow = mounds.receiveShadow = true;
+  for (let i = 0; i < n; i++) { dm.position.set(a.x + (i % a.w) + .5 - 10, .22, a.y + Math.floor(i / a.w) + .5 - 10); dm.updateMatrix(); mounds.setMatrixAt(i, dm.matrix); }
+  scene.add(mounds);
+  const wood = std("#c79a5b"), posts = [];
+  for (let i = 0; i <= a.w; i += 1) { posts.push([a.x + i, a.y - .35], [a.x + i, a.y + a.d + .35]); } for (let i = 0; i <= a.d; i += 1) { posts.push([a.x - .35, a.y + i], [a.x + a.w + .35, a.y + i]); }
+  const pm = new THREE.InstancedMesh(cyl(.05, .06, .6, 6), wood, posts.length); pm.castShadow = true; posts.forEach(([x, y], i) => { dm.position.set(x - 10, .3, y - 10); dm.updateMatrix(); pm.setMatrixAt(i, dm.matrix); }); scene.add(pm);
+  for (const [w, d, x, z] of [[a.w + .7, .05, cx, a.y - .35 - 10], [a.w + .7, .05, cx, a.y + a.d + .35 - 10], [.05, a.d + .7, a.x - .35 - 10, cz], [.05, a.d + .7, a.x + a.w + .35 - 10, cz]]) for (const y of [.26, .46]) mesh(box(w, .05, d), wood, x, y, z);
+  const greenM = std("#ffffff", { roughness: .6 }), headM = std("#ffffff", { roughness: .35, emissive: "#6b4a00", emissiveIntensity: .25 });
+  const stalks = new THREE.InstancedMesh(cyl(.028, .05, 1, 6).translate(0, .5, 0), greenM, n * 3);
+  const leaves = new THREE.InstancedMesh(new THREE.ConeGeometry(.09, .62, 5).translate(0, .31, 0), greenM, n * 6);
+  const heads = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.07, .2, 3, 8), headM, n * 3);
+  for (const m of [stalks, leaves, heads]) { m.castShadow = true; m.frustumCulled = false; m.count = m.instanceMatrix.count; m.setColorAt(0, new THREE.Color("#fff")); scene.add(m); }
+  cropSets.push({ a, stalks, leaves, heads });
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(Math.max(a.w, a.d) * .62, Math.max(a.w, a.d) * .72, 13, 28, 1, true), new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { t: { value: 0 } },
+    vertexShader: "varying vec2 u; void main(){ u=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }",
+    fragmentShader: "varying vec2 u; uniform float t; void main(){ float a=(1.-u.y); a=a*a*.5*(.75+.25*sin(u.x*40.+t*2.)); gl_FragColor=vec4(1.,.8,.3,a); }",
+  }));
+  beam.position.set(cx, 6.5, cz); beam.visible = false; scene.add(beam); beams.push({ a, beam });
+}
+
+function gable(w, d, rise, color) { const s = new THREE.Shape(); s.moveTo(-d / 2 - .22, 0); s.lineTo(0, rise); s.lineTo(d / 2 + .22, 0); s.closePath(); const g = new THREE.ExtrudeGeometry(s, { depth: w + .3, bevelEnabled: false }); g.translate(0, 0, -(w + .3) / 2); g.rotateY(Math.PI / 2); return g; }
+function buildTown() {
+  winMat = std("#b6e6f5", { emissive: "#ffcf6a", emissiveIntensity: 0, roughness: .2 });
+  const h = new THREE.Group(); h.position.set(.9, 0, -5.9); scene.add(h);
+  mesh(box(3.4, .28, 3.4), std("#a9a39a"), 0, .14, 0, h); mesh(box(3, 1.5, 3), std("#f6e7c7"), 0, 1.03, 0, h);
+  mesh(gable(3, 3, 1.25, 0), std("#de5a44", { roughness: .5 }), 0, 1.78, 0, h);
+  mesh(box(.42, 1.1, .42), std("#b26a4a"), .9, 2.5, -.6, h); mesh(box(.6, .95, .08), std("#7a4d27"), .4, .75, 1.52, h);
+  for (const [x, z, r] of [[-.75, 1.53, 0], [1.53, .6, 1], [1.53, -.7, 1]]) { const m = mesh(box(.62, .62, .06), winMat, x, 1.15, z, h); if (r) m.rotation.y = Math.PI / 2; mesh(box(.72, .07, .1), std("#fff"), x, .83, z + (r ? 0 : .02), h).rotation.y = r ? Math.PI / 2 : 0; }
+  for (let i = 0; i < 8; i++) { const s = mesh(sph(.14, 8), new THREE.MeshStandardMaterial({ color: "#fff", transparent: true, opacity: .5 }), 0, 0, 0); s.castShadow = false; smoke.push({ s, o: i / 8 }); }
+
+  const b = new THREE.Group(); b.position.set(7.1, 0, 2); scene.add(b);
+  const red = std("#c8402f", { roughness: .6 }), white = std("#fbf5e6");
+  mesh(box(3, 1.7, 2.4), red, 0, .85, 0, b); mesh(gable(3, 2.4, 1.1, 0), std("#7e2c21", { roughness: .5 }), 0, 1.7, 0, b);
+  mesh(box(1.2, 1.1, .06), white, 0, .55, 1.22, b); mesh(box(1.3, .08, .08), white, 0, 1.1, 1.24, b);
+  const bar1 = mesh(box(1.5, .07, .07), white, 0, .55, 1.26, b), bar2 = mesh(box(1.5, .07, .07), white, 0, .55, 1.26, b); bar1.rotation.z = .72; bar2.rotation.z = -.72;
+
+  const s = new THREE.Group(); s.position.set(8.6, 0, 4.6); scene.add(s);
+  const steel = std("#d7e1e6", { metalness: .75, roughness: .28 });
+  mesh(cyl(.95, 1, 3.4, 28), steel, 0, 1.7, 0, s); mesh(new THREE.SphereGeometry(1, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), std("#e0533f", { metalness: .3, roughness: .35 }), 0, 3.4, 0, s);
+  for (const y of [.8, 1.7, 2.6]) mesh(new THREE.TorusGeometry(.97, .025, 6, 32).rotateX(Math.PI / 2), std("#8ea0a8", { metalness: .7 }), 0, y, 0, s);
+  mesh(new THREE.BoxGeometry(.5, 2.7, .08), std("#47565c"), -.48, 1.7, .86, s).rotation.y = -.5;
+  siloGauge = mesh(new THREE.BoxGeometry(.38, 1, .1).translate(0, .5, 0), std("#ffc531", { emissive: "#ff9d00", emissiveIntensity: 1.1 }), -.5, .42, .9, s); siloGauge.rotation.y = -.5; siloGauge.scale.y = .001;
+
+  const w = new THREE.Group(); w.position.set(6.5, 0, -7); scene.add(w);
+  mesh(cyl(.42, .78, 3.2, 10), std("#f3e8d3"), 0, 1.6, 0, w); mesh(new THREE.ConeGeometry(.55, .7, 10), std("#b65d3f"), 0, 3.5, 0, w);
+  mill = new THREE.Group(); mill.position.set(0, 3.1, .62); w.add(mill);
+  for (let i = 0; i < 4; i++) { const p = new THREE.Group(); p.rotation.z = i * Math.PI / 2; mill.add(p); mesh(box(.42, 1.6, .03), std("#f9f3e0"), .1, 1, 0, p); mesh(box(.06, 1.8, .05), std("#a8703a"), -.1, .9, 0, p); }
+  mesh(sph(.16), std("#7a4d27"), 0, 0, .04, mill);
+
+  const t = new THREE.Group(); t.position.set(-6.5, 0, -6.5); scene.add(t);
+  const leg = std("#8a5d33");
+  for (const [x, z] of [[-.5, -.5], [.5, -.5], [-.5, .5], [.5, .5]]) { const l = mesh(cyl(.05, .07, 3, 6), leg, x * .7, 1.5, z * .7, t); l.rotation.set(z * .16, 0, -x * .16); }
+  mesh(box(.95, .7, .95), std("#f2ecd9"), 0, 3.15, 0, t); mesh(new THREE.ConeGeometry(.8, .5, 4).rotateY(Math.PI / 4), std("#3f7ee8"), 0, 3.75, 0, t);
+  globeMat = std("#ffc531", { emissive: "#ffb000", emissiveIntensity: 1.3 }); mesh(sph(.2), globeMat, 0, 3.25, .5, t);
+  cups = new THREE.Group(); cups.position.set(0, 4.2, 0); t.add(cups); for (let i = 0; i < 3; i++) { const a = i * 2.094, arm = mesh(box(.6, .03, .03), std("#555"), Math.cos(a) * .3, 0, Math.sin(a) * .3, cups); arm.rotation.y = -a; mesh(sph(.08, 8), std("#e0533f"), Math.cos(a) * .6, 0, Math.sin(a) * .6, cups); }
+
+  mesh(box(1.5, .1, .1), std("#c98a3e"), -1, 1.05, -.5); for (const x of [-1.7, -.3]) mesh(cyl(.06, .07, 1.05, 6), std("#7a4d27"), x, .52, -.5);
+
+  const greens = ["#3fa13a", "#55b748", "#2e8b57"];
+  TREES.forEach(([x, y], i) => {
+    const g = new THREE.Group(); g.position.set(x - 10, 0, y - 10); g.scale.setScalar(.85 + (i % 3) * .14); scene.add(g);
+    mesh(cyl(.13, .2, 1, 8), std("#80532a"), 0, .5, 0, g);
+    for (const [ox, oy, oz, r] of [[0, 1.5, 0, .72], [.42, 1.2, .1, .5], [-.4, 1.22, -.1, .52], [0, 1.1, .4, .46]]) mesh(sph(r, 12), std(greens[i % 3], { roughness: .7 }), ox, oy, oz, g);
+    g.userData.sway = i; trees.push(g);
+  });
+  const dm = dummy(), flowers = new THREE.InstancedMesh(sph(.075, 6), std("#ffffff", { emissive: "#ffffff", emissiveIntensity: .12 }), 160), cols = ["#ff7ab6", "#ffe14d", "#ffffff", "#ff6b4a", "#b28cff"];
+  for (let i = 0; i < 160; i++) { let x, y; do { x = Math.random() * 20; y = Math.random() * 20; } while ((x > 6.4 && x < 9.2) || (y > 6.4 && y < 9.2) || SLOTS.some((s) => x > s.x - 1 && x < s.x + s.w + 1 && y > s.y - 1 && y < s.y + s.d + 1)); dm.position.set(x - 10, .12, y - 10); dm.updateMatrix(); flowers.setMatrixAt(i, dm.matrix); flowers.setColorAt(i, new THREE.Color(cols[i % 5])); }
+  scene.add(flowers);
+  for (let i = 0; i < 7; i++) { const c = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 1 }); c.position.set(-30 + i * 10, 8 + (i % 3), -22 - (i % 3) * 5); scene.add(c); for (let k = 0; k < 5; k++) mesh(sph(.9 + (k % 3) * .35, 10), m, k * .85 - 1.6, (k % 2) * .28, (k % 3) * .3, c); clouds.push({ c, m, v: .25 + (i % 3) * .1 }); }
+}
+const trees = [];
+
+function buildFarmer(f) {
+  const g = new THREE.Group(); g.scale.setScalar(.92); scene.add(g); f.g = g;
+  const over = std(f.overalls), shirt = std(f.shirt), skin = std(f.skin, { roughness: .5 }), straw = std("#ecc765", { roughness: .85 }), boot = std("#4a3324");
+  f.legL = new THREE.Group(); f.legR = new THREE.Group(); f.legL.position.set(-.13, .42, 0); f.legR.position.set(.13, .42, 0); g.add(f.legL, f.legR);
+  for (const l of [f.legL, f.legR]) { mesh(cyl(.09, .1, .36, 8), over, 0, -.18, 0, l); mesh(box(.17, .1, .26), boot, 0, -.37, .04, l); }
+  mesh(cyl(.2, .22, .3, 12), over, 0, .55, 0, g); mesh(cyl(.21, .21, .28, 12), shirt, 0, .82, 0, g);
+  mesh(box(.28, .22, .05), over, 0, .72, .2, g); for (const x of [-.1, .1]) mesh(box(.05, .2, .03), over, x, .9, .19, g);
+  f.armL = new THREE.Group(); f.armR = new THREE.Group(); f.armL.position.set(-.27, .92, 0); f.armR.position.set(.27, .92, 0); g.add(f.armL, f.armR);
+  for (const a of [f.armL, f.armR]) { mesh(cyl(.06, .06, .38, 7), shirt, 0, -.19, 0, a); mesh(sph(.07, 8), skin, 0, -.4, 0, a); }
+  mesh(sph(.21, 16), skin, 0, 1.15, 0, g);
+  for (const x of [-.08, .08]) mesh(sph(.025, 6), std("#191919"), x, 1.17, .19, g);
+  mesh(sph(.03, 6), std("#e8926a"), 0, 1.11, .21, g);
+  mesh(cyl(.42, .44, .03, 20), straw, 0, 1.28, 0, g); mesh(cyl(.17, .22, .2, 14), straw, 0, 1.38, 0, g); mesh(cyl(.225, .225, .05, 14), std("#c0482f"), 0, 1.31, 0, g);
+  if (f.key === "checker") { const c = mesh(box(.2, .28, .03), std("#c98a3e"), .08, -.32, .12, f.armR); mesh(box(.15, .2, .01), std("#fff"), 0, 0, .02, c); }
+  if (f.key === "scout") { mesh(cyl(.04, .04, .12, 8).rotateX(Math.PI / 2), std("#222"), -.05, 1.16, .25, g); mesh(cyl(.04, .04, .12, 8).rotateX(Math.PI / 2), std("#222"), .05, 1.16, .25, g); }
+  if (f.key === "chief") mesh(box(.06, .22, .02), std("#ffc531"), 0, .82, .215, g);
+  if (f.key === "picker") mesh(cyl(.02, .02, 1.05, 6), std("#8a5d33"), .1, -.1, .1, f.armR);
+  f.crate = new THREE.Group(); f.crate.position.y = 1.75; f.crate.visible = false; g.add(f.crate);
+  mesh(box(.55, .24, .4), std("#c98a3e"), 0, 0, 0, f.crate);
+  for (const [x, z] of [[-.16, 0], [0, .06], [.16, -.04]]) mesh(new THREE.CapsuleGeometry(.07, .2, 3, 8).rotateZ(1.2), std("#ffcf33", { emissive: "#c98000", emissiveIntensity: .45 }), x, .16, z, f.crate);
+  f.name_ = makeTag("name", f.name); f.bubble = makeTag("bubble"); f.bubble.style.display = "none";
+  if (f.asleep) { f.zz = makeTag("zz", "z z z"); }
+}
+
+// Sparkle pool. Fading is done by colour because the blending is additive.
+const SP = 500, spData = [];
+function buildSparks() {
+  const g = new THREE.BufferGeometry(), pos = new Float32Array(SP * 3), col = new Float32Array(SP * 3);
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  sparks = new THREE.Points(g, new THREE.PointsMaterial({ size: .42, map: starTexture(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+  sparks.frustumCulled = false; scene.add(sparks);
+  for (let i = 0; i < SP; i++) spData.push({ life: 0, max: 1, x: 0, y: -50, z: 0, vx: 0, vy: 0, vz: 0, g: 0, c: new THREE.Color() });
+}
+let spI = 0;
+function emit(p, n, color, speed = 2, grav = 2, life = 1.1) {
+  if (reduced) return; const c = new THREE.Color(color);
+  for (let i = 0; i < n; i++) { const s = spData[spI = (spI + 1) % SP], a = Math.random() * 6.28, e = Math.random() * 3.14 - 1.57, v = speed * (.4 + Math.random() * .6); s.x = p.x; s.y = p.y; s.z = p.z; s.vx = Math.cos(a) * Math.cos(e) * v; s.vy = Math.abs(Math.sin(e)) * v + speed * .3; s.vz = Math.sin(a) * Math.cos(e) * v; s.g = grav; s.max = s.life = life * (.6 + Math.random() * .6); s.c.copy(c); }
+}
+function fireworks(at) {
+  if (reduced) return;
+  const cols = ["#ffc531", "#ff5c8a", "#57d6ff", "#8dff6a", "#ffffff", "#c58bff"];
+  for (let i = 0; i < 9; i++) setTimeout(() => { const p = at.clone().add(new THREE.Vector3((Math.random() - .5) * 11, 5 + Math.random() * 5, (Math.random() - .5) * 11)); emit(p, 60, cols[i % 6], 5.5, 2.4, 1.5); }, i * 280);
+}
+function coinBurst(from, usd) {
+  const n = Math.max(6, Math.min(26, Math.round(usd / 25)));
+  for (let i = 0; i < n; i++) coins.push({ a: from.clone(), t: -i * .05, dur: .85 + Math.random() * .3, r: Math.random() * 6, side: (Math.random() - .5) * 2.2 });
+}
+const SILO_TOP = () => new THREE.Vector3(8.6, 3.9, 4.6);
+function spawnCrow(p) {
+  const g = new THREE.Group(), m = std("#16161f", { roughness: .4 }); mesh(sph(.2, 10).scale(1, .75, 1.45), m, 0, 0, 0, g); mesh(sph(.12, 8), m, 0, .12, .28, g); mesh(new THREE.ConeGeometry(.05, .18, 6).rotateX(Math.PI / 2), std("#e6a12d"), 0, .1, .44, g);
+  const l = new THREE.Group(), r = new THREE.Group(); g.add(l, r); mesh(box(.5, .03, .24).translate(-.25, 0, 0), m, 0, 0, 0, l); mesh(box(.5, .03, .24).translate(.25, 0, 0), m, 0, 0, 0, r);
+  g.position.copy(p).add(new THREE.Vector3(-9, 7, -6)); scene.add(g); crowsLive.push({ g, l, r, to: p.clone().add(new THREE.Vector3(0, .7, 0)), t: 0 });
+}
+
+function initWorld() {
+  renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08;
+  scene = new THREE.Scene(); scene.fog = new THREE.Fog("#bfeaf7", 60, 150);
+  camera = new THREE.PerspectiveCamera(34, 1.6, 3, 420); camera.position.set(19, 23, 30);
+  controls = new THREE.OrbitControls(camera, cv); controls.enableDamping = true; controls.dampingFactor = .07; controls.enablePan = false; controls.minDistance = 14; controls.maxDistance = 62; controls.maxPolarAngle = 1.32; controls.minPolarAngle = .38;
+  controls.autoRotate = !reduced; controls.autoRotateSpeed = .22; controls.target.set(0, .4, 0);
+  hemi = new THREE.HemisphereLight("#e6f6ff", "#6b9b4c", .5); scene.add(hemi);
+  sun = new THREE.DirectionalLight("#fff0cf", 1.25); sun.position.set(-16, 26, 12); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -19, right: 19, top: 19, bottom: -19, near: 1, far: 70 }); sun.shadow.bias = -.0004; sun.shadow.normalBias = .03; scene.add(sun);
+  moon = new THREE.PointLight("#ffcf7a", 0, 12); moon.position.set(.9, 1.6, -3.6); scene.add(moon);
+  skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { a: { value: new THREE.Color("#3aa7e8") }, b: { value: new THREE.Color("#d9f4ff") } },
+    vertexShader: "varying vec3 p; void main(){ p=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }",
+    fragmentShader: "varying vec3 p; uniform vec3 a,b; void main(){ float h=clamp(normalize(p).y*1.6+.15,0.,1.); gl_FragColor=vec4(pow(mix(b,a,h),vec3(2.2)),1.); }" });
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(220, 24, 16), skyMat));
+  const sp = new Float32Array(900); for (let i = 0; i < 300; i++) { const a = Math.random() * 6.28, e = Math.random() * 1.3 + .1; sp.set([Math.cos(a) * Math.cos(e) * 190, Math.sin(e) * 190, Math.sin(a) * Math.cos(e) * 190], i * 3); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(sp, 3)); stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: "#fff", size: 1.6, transparent: true, opacity: 0, fog: false, depthWrite: false })); scene.add(stars);
+  buildIsland(); accounts.forEach(buildField); buildTown(); Object.values(farmers).forEach(buildFarmer); buildSparks();
+  coinMesh = new THREE.InstancedMesh(cyl(.16, .16, .05, 18).rotateX(Math.PI / 2), std("#ffc531", { metalness: .9, roughness: .22, emissive: "#b86f00", emissiveIntensity: .55 }), 40); coinMesh.frustumCulled = false; coinMesh.castShadow = true; scene.add(coinMesh);
+  const rg = new THREE.BufferGeometry(); rg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(1200), 3)); rainLines = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: "#cfe3ff", transparent: true, opacity: .4 })); rainLines.frustumCulled = false; rainLines.visible = false; scene.add(rainLines);
+  for (let i = 0; i < 200; i++) rainD.push([Math.random() * 40 - 20, Math.random() * 16, Math.random() * 40 - 20]);
+  if (THREE.EffectComposer && THREE.UnrealBloomPass && THREE.GammaCorrectionShader) {
+    const target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
+    composer = new THREE.EffectComposer(renderer, target); composer.addPass(new THREE.RenderPass(scene, camera));
+    bloom = new THREE.UnrealBloomPass(new THREE.Vector2(4, 4), .32, .5, 1.1); composer.addPass(bloom);
+    composer.addPass(new THREE.ShaderPass({ uniforms: { tDiffuse: { value: null } }, vertexShader: "varying vec2 u; void main(){ u=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }",
+      fragmentShader: "uniform sampler2D tDiffuse; varying vec2 u; void main(){ vec3 c=texture2D(tDiffuse,u).rgb*.72; c=clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.,1.); float l=dot(c,vec3(.3,.59,.11)); c=clamp(mix(vec3(l),c,1.45),0.,1.); vec2 q=u-.5; c*=1.-dot(q,q)*.55; gl_FragColor=vec4(pow(c,vec3(1./2.2)),1.); }" }));
+  }
+  labelFields();
+  const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w) return; lastSize = { w, h }; renderer.setSize(w, h, false); composer?.setSize(w, h); camera.aspect = w / h; camera.position.setLength(w < 620 ? 60 : 43); camera.updateProjectionMatrix(); };
+  new ResizeObserver(resize).observe(stage); resize();
+  bindPointer();
+}
+const rainD = [];
+let fieldTags = [], otherTags = [];
+function labelFields() {
+  fieldTags = accounts.map((a) => ({ a, el: makeTag("sign"), ready: makeTag("readytag", "Your harvest is ready!"), pos: wp(a.x + a.w / 2, a.y + a.d / 2, 1.9), rpos: wp(a.x + a.w / 2, a.y + a.d / 2, 3.2) }));
+  fieldTags.forEach((f) => { f.ready.style.display = "none"; });
+  otherTags = [{ el: makeTag("sign gold"), pos: new THREE.Vector3(8.6, 4.8, 4.6), silo: true }, { el: makeTag("sign light", "Weather station"), pos: new THREE.Vector3(-6.5, 4.9, -6.5) }];
+}
+
+let focusV = null, focusUntil = 0, dragging = false;
+function focusOn(v) { if ($("followBtn").dataset.on === "1" && !reduced) { focusV = v.clone(); focusUntil = performance.now() + 5000; } }
+function bindPointer() {
+  let down = null;
+  cv.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY }; dragging = true; controls.autoRotate = false; focusV = null; });
+  addEventListener("pointerup", () => { dragging = false; });
+  cv.addEventListener("pointerup", (e) => { if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 7) pick(e); down = null; });
+}
+function pick(ev) {
+  const r = cv.getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top;
+  for (const f of Object.values(farmers)) { const p = f.g.position.clone().add(new THREE.Vector3(0, .8, 0)).project(camera), sx = (p.x + 1) / 2 * r.width, sy = (1 - p.y) / 2 * r.height; if (Math.hypot(px - sx, py - sy) < 30) { sfx.plink(); emit(f.g.position.clone().add(new THREE.Vector3(0, 1.4, 0)), 14, "#fff2a8", 1.6); const paras = [f.blurb]; if (f.key === "chief") paras.push(view.report ? `Report for ${view.report.day}: ${view.report.report}` : "No report yet."); if (f.key === "researcher" && view.brief?.researcher_notes) paras.push(view.brief.researcher_notes); return inspect(f.name, paras); } }
+  const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(px / r.width * 2 - 1, -(py / r.height * 2 - 1)), camera);
+  const hit = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3()); if (!hit) return;
+  const gx = hit.x + 10, gy = hit.z + 10;
+  for (const a of accounts) if (gx >= a.x && gx < a.x + a.w && gy >= a.y && gy < a.y + a.d) { sfx.plink(); emit(hit.clone().setY(.8), 22, a.crop === "corn" ? "#ffe14d" : "#fff2a8", 2); return inspectField(a); }
+  for (const l of LOCKED) if (gx >= l.x && gx < l.x + l.w && gy >= l.y && gy < l.y + l.d) return inspect("Empty land", ["These plots are unused. The four working fields are the Grokbot paper strategies."]);
+  if (Math.hypot(gx - 17.8, gy - 13) < 3.4) { emit(SILO_TOP(), 26, "#ffd76a", 2.5); sfx.coin(); return inspect("Silo", ["Everything brought in across all fields. It's paper money for now."], [["All time", money(totalsNow.silo)], ["Today", money(totalsNow.today)]]); }
+  if (Math.hypot(gx - 3.5, gy - 3.5) < 2.4) return inspectBrief();
+  if (Math.hypot(gx - 10.9, gy - 4.1) < 2.6) return inspect(farmers.chief.name, [farmers.chief.blurb, view.report ? `Report for ${view.report.day}: ${view.report.report}` : "No report yet."]);
+}
+
+function updateCrops(t, dt) {
+  const d = dummy(), gold = new THREE.Color("#e7b320"), g1 = new THREE.Color("#63c24c"), g2 = new THREE.Color("#3a9b3e"), dead = new THREE.Color("#8d6f43"), wheat = new THREE.Color("#d9c557"), cob = new THREE.Color("#ffd23b");
+  for (const { a, stalks, leaves, heads } of cropSets) {
+    const n = a.w * a.d; a.shownPct += (a.p.pct - a.shownPct) * Math.min(1, dt * (reduced ? 60 : 1.6));
+    const grown = a.shownPct * n, c = a.p.bust ? dead : a.p.ready ? gold : a.p.level >= 2 ? g2 : g1;
+    for (let i = 0; i < n; i++) {
+      const open = a.openTile === i, g = a.p.bust ? .35 : Math.max(Math.min(1, grown - i), open ? .55 + Math.sin(t * .004) * .05 : 0), px = a.x + (i % a.w) + .5 - 10, pz = a.y + Math.floor(i / a.w) + .5 - 10;
+      for (let k = 0; k < 3; k++) {
+        const idx = i * 3 + k, ox = [-.24, .24, 0][k] + ((i * 13 + k * 7) % 5 - 2) * .012, oz = [-.17, -.14, .22][k], h = (a.crop === "corn" ? 1.5 : 1.05) * (.2 + .8 * g), sway = reduced ? 0 : Math.sin(t * .0013 + i + k) * .05;
+        const s = g > 0 ? 1 : 0;
+        d.position.set(px + ox, .28, pz + oz); d.rotation.set(sway, 0, sway * .7); d.scale.set(s, h * s, s); d.updateMatrix(); stalks.setMatrixAt(idx, d.matrix); stalks.setColorAt(idx, c);
+        for (const [j, side] of [[0, 1], [1, -1]]) {
+          d.position.set(px + ox, .28 + h * (.35 + j * .22), pz + oz); d.rotation.set(sway, side * .9 + k, side * 1.05); const ls = a.crop === "corn" ? s * (.5 + .7 * g) : 0; d.scale.set(ls, ls, ls * .3); d.updateMatrix(); leaves.setMatrixAt((idx) * 2 + j, d.matrix); leaves.setColorAt(idx * 2 + j, c);
+        }
+        const show = g >= 1 || (a.crop === "wheat" && g > .6) ? 1 : 0;
+        d.position.set(px + ox + sway * h * .5, .28 + h * (a.crop === "corn" ? .66 : 1), pz + oz); d.rotation.set(sway, k, a.crop === "corn" ? .25 : 0); const hs = (a.crop === "corn" && a.p.level < 2 && !a.p.ready) ? 0 : show; d.scale.setScalar(hs * (a.p.ready ? 1.25 : 1)); d.updateMatrix(); heads.setMatrixAt(idx, d.matrix); heads.setColorAt(idx, a.crop === "corn" ? cob : wheat);
+      }
+    }
+    for (const m of [stalks, leaves, heads]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+    if (a.p.ready && Math.random() < .5) emit(new THREE.Vector3(a.x + Math.random() * a.w - 10, 1.2 + Math.random(), a.y + Math.random() * a.d - 10), 1, "#ffdf70", .7, -.4, 1.6);
+    if (a.openTile >= 0 && Math.random() < .12) emit(new THREE.Vector3(a.x + (a.openTile % a.w) + .5 - 10, 1.1, a.y + Math.floor(a.openTile / a.w) + .5 - 10), 1, "#a8ffa0", .6, -.3, 1.1);
+  }
+}
+function updateFarmers(t, dt) {
+  const walkers = Object.values(farmers);
+  for (const f of walkers) {
+    const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy), step = (reduced ? 60 : f.speed * (demo ? 2.2 : 1)) * dt, moving = d > .03;
+    if (moving) { const m = Math.min(step, d); f.x += dx / d * m; f.y += dy / d * m; f.dir = Math.atan2(dx, dy); } else if (f.res) { const r = f.res; f.res = null; r(); }
+    const g = f.g; g.position.set(f.x - 10, .05 + (moving && !reduced ? Math.abs(Math.sin(t * .012)) * .07 : 0), f.y - 10);
+    if (f.dir !== undefined) { let e = f.dir - g.rotation.y; e = Math.atan2(Math.sin(e), Math.cos(e)); g.rotation.y += e * Math.min(1, dt * 10); }
+    const sw = moving && !reduced ? Math.sin(t * .012) * .75 : (reduced ? 0 : Math.sin(t * .002 + f.x) * .05);
+    f.legL.rotation.x = sw; f.legR.rotation.x = -sw; f.armL.rotation.x = -sw * .8; f.armR.rotation.x = sw * .8;
+    if (f.asleep) { g.rotation.x = -.25; f.armL.rotation.x = f.armR.rotation.x = .1; }
+    f.crate.visible = !!f.carry;
+    const p = place(f.name_, g.position.clone().add(new THREE.Vector3(0, -.05, 0)), 15);
+    const talk = f.say && performance.now() < f.sayT;
+    f.bubble.style.display = talk ? "" : "none";
+    if (talk) { f.bubble.textContent = f.say; place(f.bubble, g.position.clone().add(new THREE.Vector3(0, 1.8, 0)), -14); }
+    if (f.zz) place(f.zz, g.position.clone().add(new THREE.Vector3(.35, 1.8, 0)), reduced ? 0 : Math.sin(t * .002) * 4);
+  }
+  const s = farmers.scout;
+  if (!queueBusy && !s.res && !reduced && t > (s.nextWander || 0)) { s.nextWander = t + 3200 + Math.random() * 3000; const a = accounts[Math.floor(Math.random() * accounts.length)]; s.tx = a.x + Math.random() * a.w; s.ty = a.y - .8; }
+  const c = farmers.checker; if (!reduced && t > (c.nextWander || 0)) { c.nextWander = t + 5000; c.dir = Math.random() * 6; }
+  const p = farmers.picker; if (!queueBusy && !p.res && !demo) { p.tx = SPOTS.home[0]; p.ty = SPOTS.home[1]; }
+}
+function updateFx(t, dt) {
+  const pa = sparks.geometry.attributes.position, ca = sparks.geometry.attributes.color;
+  for (let i = 0; i < SP; i++) { const s = spData[i]; if (s.life > 0) { s.life -= dt; s.vy -= s.g * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt; const f = Math.max(0, s.life / s.max) * (.75 + .25 * Math.sin(t * .03 + i)); pa.setXYZ(i, s.x, s.y, s.z); ca.setXYZ(i, s.c.r * f, s.c.g * f, s.c.b * f); } else ca.setXYZ(i, 0, 0, 0); }
+  pa.needsUpdate = ca.needsUpdate = true;
+  const d = dummy(); let live = 0;
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i]; c.t += dt / c.dur; if (c.t < 0) continue;
+    if (c.t >= 1) { coins.splice(i, 1); emit(SILO_TOP(), 7, "#ffd76a", 2.4); sfx.plink(); continue; }
+    const to = SILO_TOP(), e = c.t; if (live < 40) { d.position.lerpVectors(c.a, to, e); d.position.y += Math.sin(e * Math.PI) * 4.2; d.position.x += Math.sin(e * Math.PI) * c.side; d.rotation.set(c.r + t * .012, t * .01, 0); d.scale.setScalar(1); d.updateMatrix(); coinMesh.setMatrixAt(live++, d.matrix); }
+  }
+  coinMesh.count = live; coinMesh.instanceMatrix.needsUpdate = true;
+  for (let i = crowsLive.length - 1; i >= 0; i--) {
+    const k = crowsLive[i]; k.t += dt; const fl = Math.sin(t * .03) * .7; k.l.rotation.z = -fl; k.r.rotation.z = fl;
+    if (k.t < 1.4) { k.g.position.lerp(k.to, dt * 4); k.g.lookAt(k.to); }
+    else { k.g.position.add(new THREE.Vector3(5 * dt, 5 * dt, -4 * dt)); k.g.rotation.y = 2.2; }
+    if (k.t > 3.4) { scene.remove(k.g); crowsLive.splice(i, 1); }
+  }
+  for (const f of floats.slice()) { f.pos.y += dt * 1.1; f.life--; place(f.el, f.pos); f.el.style.opacity = Math.min(1, f.life / 25); if (f.life <= 0) { f.el.remove(); floats.splice(floats.indexOf(f), 1); } }
+  for (const { s, o } of smoke) { const q = (t * .00022 + o) % 1; s.position.set(1.8 + q * .9 + Math.sin(q * 9) * .12, 3.2 + q * 3, -6.5); s.scale.setScalar(.6 + q * 2.4); s.material.opacity = (1 - q) * .45; s.visible = !reduced; }
+  if (mill && !reduced) { mill.rotation.z -= dt * (mood.storm > .5 ? 1.9 : .65); cups.rotation.y += dt * (mood.storm > .5 ? 8 : 3); }
+  trees.forEach((g) => { if (!reduced) g.rotation.z = Math.sin(t * .0009 + g.userData.sway) * (.012 + mood.storm * .035); });
+  clouds.forEach((c) => { if (reduced) return; c.c.position.x += c.v * dt * (1 + mood.storm); if (c.c.position.x > 34) c.c.position.x = -34; });
+}
+function updateMood(t, dt) {
+  const w = weather(), night = !demo && closedMarket() ? 1 : 0, storm = w.key === "negative" ? 1 : 0, haze = w.key === "flip" ? .6 : w.key === "unknown" ? .35 : 0, k = Math.min(1, dt * 1.8);
+  mood.day += ((1 - night) - mood.day) * k; mood.storm += (storm - mood.storm) * k; mood.haze += (haze - mood.haze) * k;
+  const dayC = new THREE.Color("#2f9cf0").lerp(new THREE.Color("#3e4a6b"), mood.storm).lerp(new THREE.Color("#8ba7bd"), mood.haze), horiz = new THREE.Color("#e4f7ff").lerp(new THREE.Color("#7d8aa3"), mood.storm).lerp(new THREE.Color("#cfdde6"), mood.haze);
+  skyMat.uniforms.a.value.copy(new THREE.Color("#070b2e").lerp(dayC, mood.day)); skyMat.uniforms.b.value.copy(new THREE.Color("#28315f").lerp(horiz, mood.day));
+  scene.fog.color.copy(skyMat.uniforms.b.value);
+  const flash = mood.flash; mood.flash = Math.max(0, flash - dt * 3.2);
+  if (storm && !reduced && Math.random() < dt * .09) { mood.flash = 1; setTimeout(() => { mood.flash = .7; }, 110); }
+  sun.intensity = (.16 + mood.day * (1.0 - mood.storm * .5 - mood.haze * .3)) + flash * 1.1;
+  sun.color.set(mood.day > .5 ? "#fff0cf" : "#9fb4ff"); hemi.intensity = .18 + mood.day * (.26 - mood.storm * .06) + flash * .6;
+  winMat.emissiveIntensity = (1 - mood.day) * 1.8; moon.intensity = (1 - mood.day) * 1.6; stars.material.opacity = (1 - mood.day) * .9;
+  waterMat.uniforms.t.value = reduced ? 3 : t * .001; waterMat.uniforms.day.value = mood.day; waterMat.uniforms.storm.value = mood.storm;
+  clouds.forEach((c) => c.m.color.set(mood.storm > .5 ? "#7f8aa3" : "#ffffff"));
+  globeMat.color.set({ positive: "#ffc531", flip: "#c8ced3", negative: "#5b6cff", unknown: "#a7b3ba" }[w.key]); globeMat.emissive.set({ positive: "#ffb000", flip: "#7a8088", negative: "#3644ff", unknown: "#55606a" }[w.key]);
+  rainLines.visible = storm && !reduced;
+  if (rainLines.visible) { const a = rainLines.geometry.attributes.position; rainD.forEach((r, i) => { r[1] -= dt * 19; r[0] -= dt * 3; if (r[1] < 0) { r[1] = 16; r[0] = Math.random() * 40 - 20; r[2] = Math.random() * 40 - 20; } a.setXYZ(i * 2, r[0], r[1], r[2]); a.setXYZ(i * 2 + 1, r[0] + .08, r[1] + .55, r[2]); }); a.needsUpdate = true; }
+  if (bloom) bloom.strength = .32 + (1 - mood.day) * .25 + flash * .3;
+  if (!reduced && (1 - mood.day) > .5 && Math.random() < .35) emit(new THREE.Vector3(Math.random() * 20 - 10, .5 + Math.random() * 1.6, Math.random() * 20 - 10), 1, "#caff6a", .25, 0, 2.2);
+  if (!reduced && mood.storm < .5 && Math.random() < .03) emit(new THREE.Vector3(8.6 + Math.random() - .5, 3.3 + Math.random() * .6, 4.6 + Math.random()), 2, "#ffffff", .3, 0, .6);
+}
+function updateLabels() {
+  for (const f of fieldTags) {
+    const p = f.a.p; f.el.textContent = `${f.a.name} · PAPER`; f.el.className = "tag sign" + (p.ready ? " gold" : p.bust ? " bad" : "");
+    place(f.el, f.pos); f.ready.style.display = p.ready ? "" : "none"; if (p.ready) place(f.ready, f.rpos);
+  }
+  beams.forEach((b) => { b.beam.visible = b.a.p.ready; b.beam.material.uniforms.t.value = performance.now() * .001; });
+  for (const o of otherTags) { if (o.silo) o.el.textContent = "Silo " + money(shownSilo); place(o.el, o.pos); }
+  if (siloGauge) siloGauge.scale.y = Math.max(.001, Math.min(1, Math.abs(shownSilo) / 5000)) * 2.5;
+}
+
+let lastT = 0;
+function frame(t) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(.05, (t - lastT) / 1000 || .016); lastT = t;
+  shownToday += (totalsNow.today - shownToday) * .08; shownSilo += (totalsNow.silo - shownSilo) * .08;
+  const setStat = (el, v) => { el.textContent = money(v); el.className = Math.round(v) > 0 ? "pos" : Math.round(v) < 0 ? "neg" : ""; };
+  setStat($("today"), shownToday); setStat($("silo"), shownSilo);
+  if (focusV && !dragging) { controls.target.lerp(focusV, dt * 1.6); if (performance.now() > focusUntil) focusV = null; }
+  else if (!dragging && !queueBusy) controls.target.lerp(new THREE.Vector3(0, .4, 0), dt * .6);
+  controls.update(); updateMood(t, dt); updateCrops(t, dt); updateFarmers(t, dt); updateFx(t, dt); updateLabels();
+  if (composer) composer.render(dt); else renderer.render(scene, camera);
+}
+$("followBtn").addEventListener("click", () => { const b = $("followBtn"), on = b.dataset.on !== "1"; b.dataset.on = on ? "1" : "0"; b.textContent = on ? "Follow on" : "Follow off"; controls && (controls.autoRotate = on && !reduced); });
+try {
+  if (!window.THREE) throw new Error("3D library did not load");
+  initWorld(); requestAnimationFrame(frame);
+} catch (e) { console.log(e); $("no3d").hidden = false; }
+</script>
+
+</body></html>
