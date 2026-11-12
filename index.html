@@ -136,7 +136,7 @@ button.gold { background: var(--sun); color: var(--ink); box-shadow: 0 4px 0 var
     </div>
     <aside class="side">
       <section class="card"><h2>Grokbot alert activity</h2><div class="link"><i id="linkDot" class="dot off"></i><div><strong id="linkTitle">Checking</strong><p class="note" id="linkSub"></p></div></div></section>
-      <section class="card"><h2>Two Lucid 25k PAPER accounts</h2><div id="evalBar"></div><p class="note">Official LucidPro 25k: target $1,250 · max loss $1,000 · official daily loss limit none · max 2 mini or 20 micros (support.lucidtrading.com, checked 12 Nov 2026). Your approved daily stop is $400, which is not a Lucid official limit. Both accounts will run the same MGC v5 bot. Neither is live — the meters show the shared Grokbot MGC v5 paper record as a preview, not two funded ledgers or a pass certificate. Open equity, session boundaries, consistency and trailing rules are not verified here.</p></section>
+      <section class="card"><h2>Two Lucid 25k accounts</h2><div id="evalBar"></div><p class="note">Official LucidPro 25k: target $1,250 · max loss $1,000 · official daily loss limit none · max 2 mini or 20 micros (support.lucidtrading.com, checked 12 Nov 2026). Your approved daily stop is $400, which is not a Lucid official limit. LFE02563476820004 is MGC v5 · LIVE when the card shows ARMED (inferred from logged sends, not by reading secrets). LFE02563476820005 stays MGC v5 · PAPER (would_send only). Estimated P&amp;L uses alert prices, not broker fills, and is not a pass certificate. Open equity, session boundaries, consistency and trailing rules are not verified here.</p></section>
       <section class="card"><h2>Strategy fields</h2><div id="accts"></div></section>
       <section class="card"><h2>Farm badges</h2><div class="badges" id="badges"></div></section>
       <section class="card inspect" aria-live="polite"><h2 id="iTitle">Tap anything on the farm</h2><div id="iBody"><p>Farmers are your agents, fields are your accounts, and every crate of crop is money coming in.</p></div></section>
@@ -201,7 +201,7 @@ const FIELD_ROWS = [
   {id:"orb5",name:"ORB5 MNQ",firm:"PAPER · MNQ · real fills only",crop:"corn",rules:FIELD_RULES},
   {id:"orb5_room",name:"ORB5 Room MNQ",firm:"PAPER · MNQ · real fills only",crop:"corn",rules:FIELD_RULES},
   {id:"orb5_gold",name:"ORB5 Gold",firm:"PAPER · MGC · real fills only",crop:"wheat",rules:FIELD_RULES},
-  {id:"mgc",name:"MGC v5 Gold",firm:"PAPER · MGC v5 · not live on Lucid",crop:"wheat",rules:FIELD_RULES}
+  {id:"mgc",name:"MGC v5 Gold",firm:"PAPER strategy ledger · live Lucid fills are on the 004 card",crop:"wheat",rules:FIELD_RULES}
 ];
 let accounts = FIELD_ROWS.map(blankAccount);
 
@@ -335,14 +335,28 @@ function refreshPanels() {
     s.textContent = `${a.firm}. Today ${signed(today)}. ${closed.length ? `${closed.length} trades, ${Math.round(wins / closed.length * 100)}% wins` : "No fills yet"}${openN?` · ${openN} open`:""}${alert}`;
     row.append(s); box.append(row);
   }
-  const mgcP=progressOf(mgcDays(),LUCID_25K_RULES);
-  const mgcToday=(view.strategies?.mgc?.today_pnl) ?? 0;
   const eb=$("evalBar"); eb.textContent="";
-  for(const n of [1,2]){
-    const wrap=document.createElement("div"); wrap.style.margin="0 0 12px";
-    const h=document.createElement("strong"); h.textContent="Lucid 25k #"+n+" · MGC v5 · PAPER (not live)";
-    wrap.append(h, meter(mgcP.goal+" (shared paper preview)",mgcP.pct), meter(`Max loss room (estimate): ${money(mgcP.room)} / $1,000`,mgcP.roomPct,"water"), meter(`Your $400 daily stop: ${money(Math.max(0,-mgcToday))} / $400`,Math.min(1,Math.max(0,-mgcToday)/400)));
-    eb.append(wrap);
+  for(const acc of (view.prop_accounts||[])){
+    const wrap=document.createElement("div"); wrap.style.margin="0 0 14px";
+    const h=document.createElement("strong"); h.textContent=acc.label || ("Lucid 25k " + (acc.short_label||""));
+    const arm=document.createElement("p"); arm.className="note";
+    const open=acc.open_position;
+    const openTxt=open&&open.side&&open.side!=="flat"?`Open: ${open.side} ${open.qty} MGC at ${open.entry_price}`:"No open position.";
+    const blockTxt=acc.blocked_for_day?("Blocked for the day"+(acc.blocked_reason?" -- "+acc.blocked_reason:"")):"Entries allowed (by bot state).";
+    const armTxt=acc.live?`Arm: ${acc.armed||"UNKNOWN"}${acc.armed_source?" ("+acc.armed_source+")":""}. `:"";
+    arm.textContent=armTxt+openTxt+" "+blockTxt;
+    const today=Number(acc.today_pnl||0);
+    const stopUsed=Math.max(0,-today);
+    const p=progressOf((acc.daily_pnl||[]).map(d=>({day:d.day,pnl:d.pnl})),LUCID_25K_RULES);
+    wrap.append(h, arm, meter(`Estimated P&L (signal prices, not fills): ${money(p.profit)} / $1,250 target`,p.pct), meter(`Max loss room (estimate): ${money(p.room)} / $1,000`,p.roomPct,"water"), meter(`Your $400 daily stop: ${money(stopUsed)} / $400`,Math.min(1,stopUsed/400)));
+    const sends=acc.today_sends||[];
+    const list=document.createElement("p"); list.className="note";
+    list.textContent=sends.length?sends.map(s=>{
+      const when=s.created_at?new Date(s.created_at).toLocaleTimeString("en-GB",{timeZone:"Europe/London",hour:"2-digit",minute:"2-digit"})+" UK":"";
+      const err=(s.status==="failed"||s.status==="held")&&s.error?(" -- "+s.error):"";
+      return (when+" "+(s.kind||s.command)+" "+s.status+err).trim();
+    }).join(" | "):(acc.live?"No live entries or exits today.":"No would_send rows today.");
+    wrap.append(list); eb.append(wrap);
   }
   const rb = $("readyBanner"), readyA = [];
   rb.hidden = true; rb.textContent = "";
